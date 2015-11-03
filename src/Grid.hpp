@@ -27,31 +27,61 @@ public:
 //****************************************
 
 class fieldPoint{
-
+public:
+	//frame number to avoid reinitialization of sample grid
+	int frameNum;
+	//scaler value at thet point
 	float scaler;
 	Vector3 gradiant,
 			position;
 
-	void clear();
+	fieldPoint();
+	void clear(int __frameNum);
+};
+
+//TRIPLET
+//****************************************
+
+class Triplet{
+public:
+	int x,y,z;
+	Triplet(){
+		x=0;
+		y=0;
+		z=0;
+	}
+	Triplet(int __x,int __y,int __z){
+		x=__x;
+		y=__y;
+		z=__z;
+	}
 };
 
 // GRID
 //****************************************
 
+
 class Grid{
 
 private:
 
+	//frame number to avoid reinitialization of sample grid
+	int frameNum;
 	//Particles
 	vector<Particle> particles;
 	//set of particles per grid
 	// dimension : GRID_X GRID_Y GRID_Z
 	set <Particle*> ***space_grid;
 	// set of field points 
-	//dimenssion : GRID_X*QUALITY GRID_Y*QUALITY GRID_Z*QUALITY
+	//dimenssion : GRID_X+1*QUALITY GRID_Y+1*QUALITY GRID_Z+1*QUALITY
 	fieldPoint*** sample_grid;
 
-	float COLL_SCAN_RADIUS,REND_SCAN_RADIUS,SIDE_LENGTH;
+	//list of sample grid elements with cube  int gradiant region
+	vector<Triplet> toRender,RenderProfile,CollissionProfile;
+
+	// Relative tetrahedron vertices
+	vector<Triplet> Tetrahedrons ;
+
 	
 public:
 	
@@ -76,7 +106,11 @@ public:
 	//return particles within COLL_SCAN_RADIUS of position (in scaled space)
 	vector<Particle*> collisionProfile(Vector3 position);
 	//return fieldpoints within REND_SCAN_RADIUS of position (also in scaled space)
-	vector<fieldPoint*> renderProfile(Vector3 position);
+	vector<Triplet> renderProfile(Vector3 position);
+	//trangularize index sample cube and push triangle in Vertices and Normals
+	void triangularize(Triplet index, vector<Vector3>* Vertices, vector<Vector3>* Normals);
+
+	pair<float,float> RenderField(float r);
 
 };
 

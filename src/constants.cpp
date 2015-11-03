@@ -1,12 +1,17 @@
 #include "constants.hpp"
 
-int	GRID_X = 100,
-	GRID_Y = 100,
-	GRID_Z = 100,
+int	GRID_X = 20,
+	GRID_Y = 20,
+	GRID_Z = 20,
 	QUALITY = 3,
-	NUM_PARTICLE = 10000
+	NUM_PARTICLE = 500,
+	FRAME_WINDOW = 2147483647
 	;
 
-float THRESHOLD,
-		DEL_T
+float 	THRESHOLD = 0.6,
+		CUTOFF_RADIUS = 10,
+		COLL_SCAN_RADIUS = 0.5,
+		REND_SCAN_RADIUS = CUTOFF_RADIUS,
+		SIDE_LENGTH = 100/float(GRID_X),
+		DEL_T = 0.1
 		;

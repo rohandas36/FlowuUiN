@@ -4,6 +4,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <vector>
+#include <ctime>
 
 #include "Vector3.hpp"
 #include "Vector4.hpp"
@@ -53,7 +54,7 @@ int main(int argv, char** argc){
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LESS); 
 
-	glEnable(GL_CULL_FACE);
+	// glEnable(GL_CULL_FACE);
 
 	GLuint VertexArrayID;
 	glGenVertexArrays(1, &VertexArrayID);
@@ -69,23 +70,39 @@ int main(int argv, char** argc){
 	GLuint CameraID = glGetUniformLocation(programID, "C");
 	GLuint LightID = glGetUniformLocation(programID, "LightPosition_worldspace");
 	
-	Vector3 camera_z = Vector3(-1,-1,-1);
-	Vector3 camera_y = Vector3(0,1,0);
-	Vector3 cameraPos = Vector3(0,0,0);
-	Vector3 lightPos = Vector3(-4,-4,-4);
+	Vector3 camera_z = Vector3(0,-1,0);
+	Vector3 camera_y = Vector3(0,0,1);
+	Vector3 cameraPos = Vector3(50,-100,50);
+	Vector3 lightPos = Vector3(50,0,100);
 
 	UiInit(window);
 	Grid thisGrid;
 
+	bool first=true;
+	vector<float> fluid_vertices;
+	vector<float> fluid_normals;
+
 	do{
-		vector<float> fluid_vertices;
-		vector<float> fluid_normals;
+		
 		
 		pair<vector<Vector3>,vector<Vector3> > RendererOutput;
 	//**********************************************************
-		thisGrid.update();
-		RendererOutput = thisGrid.draw();
+		// clock_t begin = clock();
+		
+		// cerr<<"Update Started..\n";	
+		if(first){
+			thisGrid.update();
+			// cerr<<"Update Done..\n";
+			RendererOutput = thisGrid.draw();
+		}
+		// cerr<<"Triangles Done..\n";
 
+		// clock_t end = clock();
+		// float elapsed_secs = float(end - begin) / CLOCKS_PER_SEC;
+
+		// cerr<<"FPS "<<int(1/elapsed_secs)<<endl;
+		// cerr<<"Vertices "<<RendererOutput.first.size()<<endl;
+		
 	//**********************************************************
 		for(int i=0;i!=RendererOutput.first.size();i++){
 			fluid_vertices.push_back(RendererOutput.first[i].x);
@@ -114,12 +131,38 @@ int main(int argv, char** argc){
 
 
 		Matrix4 cameraMatrix = Matrix4(camera_z,camera_y)*Matrix4(-cameraPos,Matrix4::TRANSLATE);
-		Matrix4 ProjectionMatrix = Matrix4(Vector4(60,(1366.0/768.0),0.01,-100),Matrix4::PROJECTION);
+		Matrix4 ProjectionMatrix = Matrix4(Vector4(60,(1366.0/768.0),0.10,300),Matrix4::PROJECTION);
 		Matrix4 PCM = ProjectionMatrix * cameraMatrix * thisGrid.Model;
 
 		glUniformMatrix4fv(MatrixID, 1, GL_FALSE, PCM.ptr());
 		glUniformMatrix4fv(ModelID, 1, GL_FALSE, thisGrid.Model.ptr());
 		glUniformMatrix4fv(CameraID, 1, GL_FALSE, cameraMatrix.ptr());
+
+		if(first){
+			cout<<"Projection\n";
+			ProjectionMatrix.print();
+			cout<<"PCM\n";
+			PCM.print();
+			cout<<"Camera\n";
+			cameraMatrix.print();
+			cout<<"Model\n";
+			thisGrid.Model.print();
+			for(int i=0;i!=RendererOutput.first.size();i++){
+				cout<<"Vertex "<<i<<" \n";
+				RendererOutput.first[i].print();
+				Vector4 temp(RendererOutput.first[i],1);
+				(cameraMatrix*temp).print();
+				temp = PCM*temp;
+				(temp).print();
+
+				(temp*(1/temp.w)).print();
+
+				// cout<<"Normal "<<i<<" ";
+
+				// (PCM*Vector4(RendererOutput.second[i],1)).print();
+			}
+			first=false;
+		}
 
 		glUniform3f(LightID, lightPos.x, lightPos.y, lightPos.z);
 		glEnableVertexAttribArray(0);
