@@ -1,11 +1,11 @@
 #include "constants.hpp"
 
-int	GRID_X = 20,
-	GRID_Y = 20,
-	GRID_Z = 20,
-	QUALITY = 3,
+int	GRID_X = 10,
+	GRID_Y = 10,
+	GRID_Z = 10,
+	QUALITY = 5,
 	NUM_PARTICLE = 500,
-	FRAME_WINDOW = 2147483647
+	FRAME_WINDOW = 2147483647 
 	;
 
 float 	THRESHOLD = 0.6,

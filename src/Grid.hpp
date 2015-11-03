@@ -82,6 +82,9 @@ private:
 	// Relative tetrahedron vertices
 	vector<Triplet> Tetrahedrons ;
 
+	float** heightField;
+	float** HFVelocity;
+	Vector3** HFNormals;
 	
 public:
 	
@@ -95,9 +98,9 @@ public:
 	// 2pass 
 	// 1st pass : particle update position and (sample and space) Grid
 	// 2nd pass : update velocity acceleration using interact()
-	void update();
+	void update(int select);
 	//iterate over whole sample_grid and return triangles and normals
-	pair<vector<Vector3>,vector<Vector3> > draw();
+	void draw(int select,vector<Vector3>* Vertices , vector<Vector3>* Normals);
 	//interpolate between two fieldpoints one higher and the other lowerthan the thresh hold 
 	//return position and gradiant at that point
 	pair<Vector3,Vector3> interpolate(fieldPoint* P1,fieldPoint* P2);

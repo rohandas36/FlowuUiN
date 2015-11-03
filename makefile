@@ -7,7 +7,11 @@ CXX = g++
 
 all: $(Files_hpp) $(Files_cpp)
 	$(CXX) $(PreFlags) $(Files_cpp) $(PostFlags)
-run: all
-	./ItFows 1>log/stdOut 2>log/stdErr
+blob: all
+	./ItFows 0 1>log/stdOut 2>log/stdErr
+hfield: all
+	./ItFows 1 1>log/stdOut 2>log/stdErr
+SPH: all
+	./ItFows 2 1>log/stdOut 2>log/stdErr
 clean: 
 	rm -f *.o *.ghc ItFows log/*

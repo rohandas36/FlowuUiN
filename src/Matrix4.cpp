@@ -48,11 +48,6 @@ Matrix4::Matrix4(Vector3 V , Matrix4::matType T){
 		column[1]=Vector4(0,V.y,0,0);
 		column[2]=Vector4(0,0,V.z,0);
 		column[3]=Vector4(0,0,0,1);
-	}else if(T==Matrix4::PROJECTION){
-		column[0]=Vector4(9.0/16.0,0,0,0);
-		column[1]=Vector4(0,1,0,0);
-		column[2]=Vector4(0,0,(100.1)/(99.9),-1);
-		column[3]=Vector4(0,0,(-(20)/(99.9)),0);
 	}
 	else if (T==Matrix4::ROTATION_Z){
 		float theta = V.mod()*(-0.0006);
@@ -65,10 +60,10 @@ Matrix4::Matrix4(Vector3 V , Matrix4::matType T){
 //fov aspect zn zf
 Matrix4::Matrix4(Vector4 in, matType T){
 	if(T==Matrix4::PROJECTION){
-		column[0]=Vector4(1/(tan(in.x*PI/360)*in.y),0,0,0);
-		column[1]=Vector4(0,1/tan(in.x*PI/360),0,0);
-		column[2]=Vector4(0,0,(2*in.z*in.w)/(in.z-in.w),-1);
-		column[3]=Vector4(0,0,(in.z+in.w)/(in.z-in.w),0);
+		column[0]=Vector4(1/(tan(in.x*PI/360.0)*in.y),0,0,0);
+		column[1]=Vector4(0,1/tan(in.x*PI/360.0),0,0);
+		column[2]=Vector4(0,0,(in.z+in.w)/(in.z-in.w),-1);
+		column[3]=Vector4(0,0,(2.0*in.z*in.w)/(in.z-in.w),0);
 	}
 }
 

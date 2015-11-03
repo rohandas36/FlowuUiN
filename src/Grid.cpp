@@ -66,6 +66,19 @@ Grid::Grid(){
 		}
 	}
 
+	heightField = new float*[GRID_X+1];
+	HFNormals = new Vector3*[GRID_X+1];
+	HFVelocity = new float*[GRID_X+1];
+	for(int i=0;i!=GRID_X+1;i++){
+		HFVelocity[i] = new float[GRID_Y+1];
+		heightField[i] = new float[GRID_Y+1];
+		HFNormals[i] = new Vector3[GRID_Y+1];
+		for(int j=0;j!=GRID_Y+1;j++){
+			heightField[i][j] = float(GRID_Z+1)*0.5*SIDE_LENGTH;
+			HFVelocity[i][j] = 0;
+		}
+	}
+
 	float MAX_GRID_RADIUS = (REND_SCAN_RADIUS*float(QUALITY)/SIDE_LENGTH) +1;
 	map<Triplet,bool,compare> isInside;
 	for(int x= -int(MAX_GRID_RADIUS);x!=int(MAX_GRID_RADIUS)+1;x++){
@@ -123,36 +136,68 @@ Grid::Grid(){
 // 2pass 
 // 1st pass : particle update position and (sample and space) Grid
 // 2nd pass : update velocity acceleration using interact()
-void Grid::update(){
+void Grid::update(int select){
 
+	if(select==0){
+		for(int i=0;i!=particles.size();i++){
+			// cerr<<"Particle "<<i<<endl;
+			vector<Triplet> renderStencil = renderProfile(particles[i].position);
+			for(int j=0;j!=renderStencil.size();j++){
+				fieldPoint* sample = &sample_grid[renderStencil[j].x][renderStencil[j].y][renderStencil[j].z];
+				// cout<<sample->frameNum<<endl;
+				if(sample->frameNum!=frameNum)
+					sample->clear(frameNum);
 
-	for(int i=0;i!=particles.size();i++){
-		// cerr<<"Particle "<<i<<endl;
-		vector<Triplet> renderStencil = renderProfile(particles[i].position);
-		for(int j=0;j!=renderStencil.size();j++){
-			fieldPoint* sample = &sample_grid[renderStencil[j].x][renderStencil[j].y][renderStencil[j].z];
-			// cout<<sample->frameNum<<endl;
-			if(sample->frameNum!=frameNum)
-				sample->clear(frameNum);
+				pair<float,float> field = RenderField((sample->position-particles[i].position).mod());
+				sample->scaler += field.first;
+				sample->gradiant = sample->gradiant+(sample->position-particles[i].position).setlen(field.second);
+			}
 
-			pair<float,float> field = RenderField((sample->position-particles[i].position).mod());
-			sample->scaler += field.first;
-			sample->gradiant = sample->gradiant+(sample->position-particles[i].position).setlen(field.second);
-		}
-
-		for(int j=0;j!=renderStencil.size();j++){
-			int inside=0;
-			if(renderStencil[j].x < (GRID_X+1)*QUALITY-1 && renderStencil[j].y < (GRID_Y+1)*QUALITY-1 && renderStencil[j].z < (GRID_Z+1)*QUALITY-1 ){
-				for(int k=0;k!=8;k++){
-					Triplet diff(renderStencil[j].x + (k%2),renderStencil[j].y + ((k/2)%2),renderStencil[j].z + ((k/4)%2));
-					if(sample_grid[diff.x][diff.y][diff.z].scaler>THRESHOLD)
-						inside++;
+			for(int j=0;j!=renderStencil.size();j++){
+				int inside=0;
+				if(renderStencil[j].x < (GRID_X+1)*QUALITY-1 && renderStencil[j].y < (GRID_Y+1)*QUALITY-1 && renderStencil[j].z < (GRID_Z+1)*QUALITY-1 ){
+					for(int k=0;k!=8;k++){
+						Triplet diff(renderStencil[j].x + (k%2),renderStencil[j].y + ((k/2)%2),renderStencil[j].z + ((k/4)%2));
+						if(sample_grid[diff.x][diff.y][diff.z].scaler>THRESHOLD)
+							inside++;
+					}
+				}
+				if(inside!=0&&inside!=8){
+					toRender.push_back(renderStencil[j]);
 				}
 			}
-			if(inside!=0&&inside!=8){
-				toRender.push_back(renderStencil[j]);
+		}
+	}
+	else if(select==1){
+		pair<int,int> Neighbours[] = {make_pair(1,0),make_pair(0,1),make_pair(-1,0),make_pair(0,-1)};
+		
+		for(int i=0;i!=GRID_X+1;i++){
+			for(int j=0;j!=GRID_Y+1;j++){
+				Vector3 origin(float(i)*SIDE_LENGTH,float(j)*SIDE_LENGTH,heightField[i][j]),final;
+				float goal=0;
+				for(int k=0;k!=4;k++){
+					pair<int,int> index = make_pair(Neighbours[k].first+i,Neighbours[k].second+j);
+					if(index.first<=GRID_X&&index.first>=0&&index.second<=GRID_Y&&index.second>=0)
+						goal+=heightField[index.first][index.second];
+					else
+						goal+=heightField[i][j];
+
+				}
+				goal = goal*0.25- heightField[i][j];
+				HFVelocity[i][j] +=goal;
+				HFVelocity[i][j] *=0.9;
 			}
 		}
+		for(int i=0;i!=GRID_X+1;i++){
+			for(int j=0;j!=GRID_Y+1;j++){
+				heightField[i][j] +=HFVelocity[i][j];
+			}
+		}
+		float pi = 3.14159265359;
+		HFVelocity[0][0] += 2*sin(float(frameNum)/6*pi);
+	}
+	else if(select==2){
+
 	}
 	frameNum=(frameNum+1)%FRAME_WINDOW;
 }
@@ -202,16 +247,66 @@ void Grid::triangularize(Triplet index, vector<Vector3>* Vertices, vector<Vector
 	}
 }
 
-pair<vector<Vector3>,vector<Vector3> > Grid::draw(){
-	vector<Vector3> Vertices,Normals;
-	map<Triplet,bool,compare> isDone;
-	for(int i=0;i!=toRender.size();i++){
-		if(toRender[i].x < (GRID_X+1)*QUALITY-1 && toRender[i].y < (GRID_Y+1)*QUALITY-1 && toRender[i].z < (GRID_Z+1)*QUALITY-1 
-			&& toRender[i].x >= 0 && toRender[i].y >= 0 && toRender[i].z >= 0 && !isDone[toRender[i]])
-			triangularize(toRender[i],&Vertices,&Normals);
-		isDone[toRender[i]] = true;
+void Grid::draw(int select,vector<Vector3>* Vertices , vector<Vector3>* Normals){
+
+	if(select==0){
+		map<Triplet,bool,compare> isDone;
+		for(int i=0;i!=toRender.size();i++){
+			if(toRender[i].x < (GRID_X+1)*QUALITY-1 && toRender[i].y < (GRID_Y+1)*QUALITY-1 && toRender[i].z < (GRID_Z+1)*QUALITY-1 
+				&& toRender[i].x >= 0 && toRender[i].y >= 0 && toRender[i].z >= 0 && !isDone[toRender[i]])
+				triangularize(toRender[i],Vertices,Normals);
+			isDone[toRender[i]] = true;
+		}
 	}
-	return make_pair(Vertices,Normals);
+	else if(select==1){
+		pair<int,int> Neighbours[] = {make_pair(1,0),make_pair(0,1),make_pair(-1,0),make_pair(0,-1)};
+		
+		for(int i=0;i!=GRID_X+1;i++){
+			for(int j=0;j!=GRID_Y+1;j++){
+				vector<Vector3> displacement;
+				Vector3 origin(float(i)*SIDE_LENGTH,float(j)*SIDE_LENGTH,heightField[i][j]),final;
+				for(int k=0;k!=4;k++){
+					pair<int,int> index = make_pair(Neighbours[k].first+i,Neighbours[k].second+j);
+					if(index.first<=GRID_X&&index.first>=0&&index.second<=GRID_Y&&index.second>=0)
+						final=Vector3(float(index.first)*SIDE_LENGTH,float(index.second)*SIDE_LENGTH,heightField[index.first][index.second]);
+					else
+						final=Vector3(float(index.first)*SIDE_LENGTH,float(index.second)*SIDE_LENGTH,heightField[i][j]);
+
+					displacement.push_back(final-origin);
+				}
+				Vector3 normal(0,0,0);
+				for(int k=0;k!=displacement.size();k++){
+					normal = normal + (displacement[k]*displacement[(k+1)%displacement.size()]);
+				}
+				HFNormals[i][j] = normal.setlen(1);
+			}
+		}
+
+		for(int i=0;i!=GRID_X;i++){
+			for(int j=0;j!=GRID_Y;j++){
+				Vector3 vertex0(float(i)*SIDE_LENGTH,float(j)*SIDE_LENGTH,heightField[i][j]),
+						vertex1(float(i+1)*SIDE_LENGTH,float(j)*SIDE_LENGTH,heightField[i+1][j]),
+						vertex2(float(i)*SIDE_LENGTH,float(j+1)*SIDE_LENGTH,heightField[i][j+1]),
+						vertex3(float(i+1)*SIDE_LENGTH,float(j+1)*SIDE_LENGTH,heightField[i+1][j+1])
+						;
+				Vertices->push_back(vertex0);
+				Vertices->push_back(vertex3);
+				Vertices->push_back(vertex1);
+				Normals->push_back(HFNormals[i][j]);
+				Normals->push_back(HFNormals[i+1][j+1]);
+				Normals->push_back(HFNormals[i+1][j]);
+				Vertices->push_back(vertex0);
+				Vertices->push_back(vertex3);
+				Vertices->push_back(vertex2);
+				Normals->push_back(HFNormals[i][j]);
+				Normals->push_back(HFNormals[i+1][j+1]);
+				Normals->push_back(HFNormals[i][j+1]);
+			}
+		}
+	}
+	else if(select==2){
+
+	}
 }
 //scaler and negation of gradiant  assuming spherically symmetric field
 pair<float,float> Grid::RenderField(float r){
