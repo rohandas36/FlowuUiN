@@ -26,6 +26,7 @@ int main(int argv, char** argc){
 	in.str(string(argc[1]));
 	int select;
 	in>>select;
+	srand(time(NULL));
 
 	if( !glfwInit() )
 	{
@@ -78,7 +79,7 @@ int main(int argv, char** argc){
 	Vector3 camera_z = Vector3(0,-1,0);
 	Vector3 camera_y = Vector3(0,0,1);
 	Vector3 cameraPos = Vector3(50,-100,50);
-	Vector3 lightPos = Vector3(50,0,100);
+	Vector3 lightPos = Vector3(50,-50,120);
 
 	UiInit(window);
 	Grid thisGrid;
@@ -86,37 +87,80 @@ int main(int argv, char** argc){
 	bool first=true;
 	vector<float> fluid_vertices;
 	vector<float> fluid_normals;
+	vector<float> sphere_vertices;
+	vector<float> sphere_normals;
+
+	vector<Vector3> vertices;
+	vector<Vector3> normals;
+
+	loadOBJ("objects/sphere.obj", vertices, normals);
+
+	for(int i=0;i!=vertices.size();i++){
+		sphere_vertices.push_back(vertices[i].x);
+		sphere_vertices.push_back(vertices[i].y);
+		sphere_vertices.push_back(vertices[i].z);
+	}
+	for(int i=0;i!=normals.size();i++){
+		sphere_normals.push_back(normals[i].x);
+		sphere_normals.push_back(normals[i].y);
+		sphere_normals.push_back(normals[i].z);
+	}
+
+	vertices.clear();
+	normals.clear();
+
+	GLuint sphere_vertexbuffer;
+	glGenBuffers(1, &sphere_vertexbuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, sphere_vertexbuffer);
+	glBufferData(GL_ARRAY_BUFFER, sphere_vertices.size()*sizeof(float), &sphere_vertices[0], GL_STATIC_DRAW);
+	
+	GLuint sphere_normalbuffer;
+	glGenBuffers(1, &sphere_normalbuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, sphere_normalbuffer);
+	glBufferData(GL_ARRAY_BUFFER, sphere_normals.size()*sizeof(float), &sphere_normals[0], GL_STATIC_DRAW);
+
+	clock_t start = clock(),end;
 
 	do{
 		
 		
 		vector<Vector3> Vertices,Normals;
 	//**********************************************************
-		// clock_t begin = clock();
 		
-		// cerr<<"Update Started..\n";	
 		if(first && select == 0){
 			thisGrid.update(select);
-			// cerr<<"Update Done..\n";
+			end=clock();
+			cerr<<"Update Time : "<<(float(end - start) / CLOCKS_PER_SEC)<<"\n";
+			start=clock();	
 			thisGrid.draw(select,&Vertices,&Normals);
-			first = false;
+			end=clock();
+			cerr<<"Triangulation Time : "<<(float(end - start) / CLOCKS_PER_SEC)<<"\n";
+			start=clock();
+			// first = false;
 		}
 		else if (select != 0){
+			
 			thisGrid.update(select);
+			end=clock();
+			cerr<<"Update Time : "<<(float(end - start) / CLOCKS_PER_SEC)<<"\n";
+			start=clock();
 			fluid_vertices.clear();
 			fluid_normals.clear();
 			thisGrid.draw(select,&Vertices,&Normals);
+			end=clock();
+			cerr<<"Triangulation Time : "<<(float(end - start) / CLOCKS_PER_SEC)<<"\n";
+			start=clock();
 		}
 		// cerr<<"Triangles Done..\n";
 
 		// clock_t end = clock();
-		// float elapsed_secs = float(end - begin) / CLOCKS_PER_SEC;
+		// float elapsed_secs = float(end - start) / CLOCKS_PER_SEC;
 
 		// cerr<<"FPS "<<int(1/elapsed_secs)<<endl;
 		// cerr<<"Vertices "<<RendererOutput.first.size()<<endl;
 		
 	//**********************************************************
-
+		
 		if(select != 2){
 			for(int i=0;i!=Vertices.size();i++){
 				fluid_vertices.push_back(Vertices[i].x);
@@ -176,7 +220,16 @@ int main(int argv, char** argc){
 				(void*)0                          // array buffer offset
 			);
 
+
+			end=clock();
+			cerr<<"Memory Allocation Time : "<<(float(end - start) / CLOCKS_PER_SEC)<<"\n";
+			start=clock();
+
 			glDrawArrays(GL_TRIANGLES, 0, fluid_vertices.size() );
+
+			end=clock();
+			cerr<<"Rasterization Time : "<<(float(end - start) / CLOCKS_PER_SEC)<<"\n";
+			start=clock();
 
 			glDisableVertexAttribArray(0);
 			glDisableVertexAttribArray(1);
@@ -184,11 +237,66 @@ int main(int argv, char** argc){
 			glDeleteBuffers(1, &fluid_vertexbuffer);
 			glDeleteBuffers(1, &fluid_normalbuffer);
 
-			glfwSwapBuffers(window);
 		}
 		else{
 
+			thisGrid.update(select);
+			end=clock();
+			cerr<<"Update Time : "<<(float(end - start) / CLOCKS_PER_SEC)<<"\n";
+			start=clock();
+			thisGrid.draw(select,&Vertices,&Normals);
+			end=clock();
+			cerr<<"Triangulation Time : "<<(float(end - start) / CLOCKS_PER_SEC)<<"\n";
+			start=clock();
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			glUseProgram(programID);
+
+			for(int i=0;i!=Vertices.size();i++){
+				Matrix4 cameraMatrix = Matrix4(camera_z,camera_y)*Matrix4(-cameraPos,Matrix4::TRANSLATE);
+				Matrix4 ProjectionMatrix = Matrix4(Vector4(60,(1366.0/768.0),10,300),Matrix4::PROJECTION);
+				float radius = CUTOFF_RADIUS*0.4;
+				Matrix4 Model = thisGrid.Model*Matrix4(Vertices[i],Matrix4::TRANSLATE)*Matrix4(Vector3(radius,radius,radius),Matrix4::SCALE);
+				Matrix4 PCM = ProjectionMatrix * cameraMatrix * Model;
+
+				glUniformMatrix4fv(MatrixID, 1, GL_FALSE, PCM.ptr());
+				glUniformMatrix4fv(ModelID, 1, GL_FALSE, Model.ptr());
+				glUniformMatrix4fv(CameraID, 1, GL_FALSE, cameraMatrix.ptr());
+
+				glUniform3f(LightID, lightPos.x, lightPos.y, lightPos.z);
+				glEnableVertexAttribArray(0);
+				glBindBuffer(GL_ARRAY_BUFFER, sphere_vertexbuffer);
+				glVertexAttribPointer(
+					0,                  // attribute
+					3,                  // size
+					GL_FLOAT,           // type
+					GL_FALSE,           // normalized?
+					0,                  // stride
+					(void*)0            // array buffer offset
+				);
+
+
+				glEnableVertexAttribArray(1);
+				glBindBuffer(GL_ARRAY_BUFFER, sphere_normalbuffer);
+				glVertexAttribPointer(
+					1,                                // attribute
+					3,                                // size
+					GL_FLOAT,                         // type
+					GL_FALSE,                         // normalized?
+					0,                                // stride
+					(void*)0                          // array buffer offset
+				);
+
+				glDrawArrays(GL_TRIANGLES, 0, sphere_vertices.size());
+				
+				glDisableVertexAttribArray(0);
+				glDisableVertexAttribArray(1);
+			}
+			end=clock();
+			cerr<<"Drawing Time : "<<(float(end - start) / CLOCKS_PER_SEC)<<"\n";
+			start=clock();
 		}
+
+		glfwSwapBuffers(window);
 
 		updateState(window,&thisGrid,
 				&cameraPos,&camera_z,&camera_y,

@@ -12,6 +12,25 @@
 
 using namespace std;
 
+//TRIPLET
+//****************************************
+
+class Triplet{
+public:
+	int x,y,z;
+	Triplet(){
+		x=0;
+		y=0;
+		z=0;
+	}
+	Triplet(int __x,int __y,int __z){
+		x=__x;
+		y=__y;
+		z=__z;
+	}
+};
+
+
 // PARTICLE
 //***************************************
 
@@ -21,6 +40,7 @@ public:
 	Vector3 position,
 		velocity,
 		acceleration;
+	Triplet Cell;
 };
 
 //FIELDPOINT
@@ -39,23 +59,6 @@ public:
 	void clear(int __frameNum);
 };
 
-//TRIPLET
-//****************************************
-
-class Triplet{
-public:
-	int x,y,z;
-	Triplet(){
-		x=0;
-		y=0;
-		z=0;
-	}
-	Triplet(int __x,int __y,int __z){
-		x=__x;
-		y=__y;
-		z=__z;
-	}
-};
 
 // GRID
 //****************************************

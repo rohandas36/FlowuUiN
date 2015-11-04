@@ -37,6 +37,7 @@ struct compare {
 };
 
 Grid::Grid(){
+	particles.resize(NUM_PARTICLE);
 	frameNum=0;
 	Triplet Temp[] = {Triplet(0,0,0),Triplet(1,1,1),Triplet(1,0,0),Triplet(1,0,1),
 						Triplet(0,0,0),Triplet(1,1,1),Triplet(1,0,1),Triplet(0,0,1),
@@ -117,16 +118,19 @@ Grid::Grid(){
 	}
 
 	for(int i=0;i!=NUM_PARTICLE;i++){
-		int X = rand()%(GRID_X-1),
-			Y = rand()%(GRID_Y-1),
-			Z = rand()%(GRID_Z-1);
+		int X = rand()%(GRID_X-2)+1,
+			Y = rand()%(GRID_Y-2)+1,
+			Z = rand()%(GRID_Z-2)+1;
 
 		Particle temp;
 		temp.position = Vector3((float(X)+float(rand()%10000)/10000.0)*SIDE_LENGTH,
 								(float(Y)+float(rand()%10000)/10000.0)*SIDE_LENGTH,
 								(float(Z)+float(rand()%10000)/10000.0)*SIDE_LENGTH);
-		particles.push_back(temp);
-		space_grid[X][Y][Z].insert(&particles[particles.size()-1]);
+		temp.velocity = Vector3(2,0,0);
+		temp.Cell= Triplet(X,Y,Z);
+		particles[i]=temp;
+		space_grid[X][Y][Z].insert(&particles[i]);
+
 	}
 }
 
@@ -136,6 +140,13 @@ Grid::Grid(){
 // 2pass 
 // 1st pass : particle update position and (sample and space) Grid
 // 2nd pass : update velocity acceleration using interact()
+float clip(int val,int uLim, int lLim){
+	if(val>=uLim)
+		return uLim;
+	if(val<=lLim)
+		return lLim;
+	return val;
+}
 void Grid::update(int select){
 
 	if(select==0){
@@ -185,7 +196,7 @@ void Grid::update(int select){
 				}
 				goal = goal*0.25- heightField[i][j];
 				HFVelocity[i][j] +=goal;
-				HFVelocity[i][j] *=0.9;
+				HFVelocity[i][j] *=0.8;
 			}
 		}
 		for(int i=0;i!=GRID_X+1;i++){
@@ -193,11 +204,49 @@ void Grid::update(int select){
 				heightField[i][j] +=HFVelocity[i][j];
 			}
 		}
+		//**************************************************
 		float pi = 3.14159265359;
-		HFVelocity[0][0] += 2*sin(float(frameNum)/6*pi);
+		HFVelocity[GRID_X/4][GRID_Y/2] += 10*sin(float(frameNum)/10*pi);
+		HFVelocity[(3*GRID_X)/4][GRID_Y/2] += 10*sin((0.5+float(frameNum)/10)*pi);
+		//**************************************************
 	}
 	else if(select==2){
+		for(int i=0;i!=particles.size();i++){
+			
+			particles[i].acceleration = Vector3(0,0,-1)*(1.3);
+			if(particles[i].position.x>GRID_X*SIDE_LENGTH){
+				particles[i].velocity.x = particles[i].velocity.x*(-1);
+			}
+			if(particles[i].position.x<0){
+				particles[i].velocity.x = particles[i].velocity.x*(-1);
+			}
+			if(particles[i].position.y>GRID_Y*SIDE_LENGTH){
+				particles[i].velocity.y = particles[i].velocity.y*(-1);				
+			}
+			if(particles[i].position.y<0){
+				particles[i].velocity.y = particles[i].velocity.y*(-1);
+			}
+			if(particles[i].position.z>GRID_Z*SIDE_LENGTH){
+				particles[i].velocity.z = particles[i].velocity.z*(-1);
+			}
+			if(particles[i].position.z<0){
+				particles[i].velocity.z = particles[i].velocity.z*(-1);				
+			}
+			vector<Particle*> neighbours = collisionProfile(particles[i].position);
+			for(int j=0;j!=neighbours.size();j++){
 
+				interact(neighbours[j],&particles[i]);
+			}
+		}
+		for(int i=0;i!=particles.size();i++){
+			particles[i].velocity = (particles[i].velocity+(particles[i].acceleration*DEL_T))*0.999;
+			space_grid[particles[i].Cell.x][particles[i].Cell.y][particles[i].Cell.z].erase(&particles[i]);
+			particles[i].position = particles[i].position+(particles[i].velocity*DEL_T);
+			particles[i].Cell = Triplet(clip(int(particles[i].position.x/SIDE_LENGTH),GRID_X-1,0),
+										clip(int(particles[i].position.y/SIDE_LENGTH),GRID_Y-1,0),
+										clip(int(particles[i].position.z/SIDE_LENGTH),GRID_Z-1,0));
+			space_grid[particles[i].Cell.x][particles[i].Cell.y][particles[i].Cell.z].insert(&particles[i]);
+		}
 	}
 	frameNum=(frameNum+1)%FRAME_WINDOW;
 }
@@ -305,7 +354,9 @@ void Grid::draw(int select,vector<Vector3>* Vertices , vector<Vector3>* Normals)
 		}
 	}
 	else if(select==2){
-
+		for(int i=0;i!=particles.size();i++){
+			Vertices->push_back(particles[i].position);
+		}
 	}
 }
 //scaler and negation of gradiant  assuming spherically symmetric field
@@ -327,11 +378,14 @@ pair<Vector3,Vector3> Grid::interpolate(fieldPoint* P1,fieldPoint* P2){
 	float alpha = (THRESHOLD-P2->scaler)/(P1->scaler-P2->scaler);
 	// cout<<P2->scaler<<endl;
 	return make_pair(P1->position*alpha+P2->position*(1.0 - alpha),P1->gradiant*alpha + P2->gradiant*(1.0 - alpha));
+
 }
 
 //update the effect particles acc based on the cause
 void Grid::interact(Particle* cause,Particle* effect){
-
+	float distance = (effect->position-cause->position).mod();
+	if(distance <COLL_SCAN_RADIUS && distance>0.01)
+		effect->acceleration = effect->acceleration + ((effect->position-cause->position).setlen(min(100.0,-10*(log(distance/(0.5*CUTOFF_RADIUS))/distance))));	
 }
 
 //return particles within COLL_SCAN_RADIUS of position (in scaled space)

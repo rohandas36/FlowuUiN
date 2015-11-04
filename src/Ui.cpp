@@ -39,7 +39,7 @@ void updateState(GLFWwindow* window, Grid* fluid,
 					Matrix4(rotation_Goal ,Matrix4::ROTATION_Z)*
 					Matrix4(rotation_Goal,Vector3(1.25,3.4,5.4))*
 					Matrix4(Vector3(-50,-50,-50),Matrix4::TRANSLATE);
-		fluid->Model = rotMat*fluid->Model;	
+		fluid->Model = rotMat*fluid->Model;
 	}
 	glfwSetCursorPos(window, 1366/2, 768/2);
 }
